@@ -247,6 +247,9 @@ const PRODUITS = [
   { id:'canette', nom:'Canette',      emoji:'🥤', prix:2.00 },
 ];
 
+const STORAGE_KEY = 'cnf-le-huit-daily';
+const PANIER_KEY = 'cnf-le-huit-panier';
+
 let panier = {};
 let ventesJour = {}; // { id: qty total vendu }
 let recetteJour = 0;
@@ -256,6 +259,42 @@ let saisie = '';
 
 // Init ventes
 PRODUITS.forEach(p => { ventesJour[p.id] = 0; });
+
+// Sauvegarde des ventes du jour dans le localStorage
+function sauvegarderJour() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ventesJour, recetteJour, nbVentes }));
+  } catch (e) { /* localStorage indisponible */ }
+}
+
+// Restaure les ventes du jour depuis le localStorage
+function chargerJour() {
+  try {
+    const brut = localStorage.getItem(STORAGE_KEY);
+    if (!brut) return;
+    const data = JSON.parse(brut);
+    PRODUITS.forEach(p => { ventesJour[p.id] = (data.ventesJour && data.ventesJour[p.id]) || 0; });
+    recetteJour = data.recetteJour || 0;
+    nbVentes = data.nbVentes || 0;
+    document.getElementById('recette-jour').textContent = recetteJour.toFixed(2).replace('.', ',');
+    document.getElementById('nb-ventes').textContent = nbVentes + ' vente(s)';
+  } catch (e) { /* données corrompues, on ignore */ }
+}
+
+// Sauvegarde le panier en cours dans le localStorage
+function sauvegarderPanier() {
+  try {
+    localStorage.setItem(PANIER_KEY, JSON.stringify(panier));
+  } catch (e) { /* localStorage indisponible */ }
+}
+
+// Restaure le panier en cours depuis le localStorage
+function chargerPanier() {
+  try {
+    const brut = localStorage.getItem(PANIER_KEY);
+    if (brut) panier = JSON.parse(brut) || {};
+  } catch (e) { panier = {}; }
+}
 
 // Init grille
 const grid = document.getElementById('produits-grid');
@@ -300,6 +339,7 @@ function confirmerQty() {
 function supprimerLigne(id) { delete panier[id]; majUI(); }
 
 function majUI() {
+  sauvegarderPanier();
   PRODUITS.forEach(p => {
     const badge = document.getElementById('badge-'+p.id);
     const qty = panier[p.id] || 0;
@@ -342,6 +382,7 @@ function valider() {
   document.getElementById('nb-ventes').textContent = nbVentes + ' vente(s)';
   showToast('✓ Encaissé : ' + total.toFixed(2).replace('.',',') + ' €');
   majTableau();
+  sauvegarderJour();
   panier = {};
   majUI();
 }
@@ -398,6 +439,7 @@ function resetJour() {
     document.getElementById('recette-jour').textContent = '0,00';
     document.getElementById('nb-ventes').textContent = '0 vente(s)';
     majTableau();
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* localStorage indisponible */ }
     showToast('Journée réinitialisée');
   });
 }
@@ -406,6 +448,7 @@ function resetPanier() {
   if (Object.keys(panier).length === 0) return;
   demanderConfirm('Vider le panier ?', 'La commande en cours sera annulée.', () => {
     panier = {};
+    try { localStorage.removeItem(PANIER_KEY); } catch (e) { /* localStorage indisponible */ }
     majUI();
     showToast('Panier vidé');
   });
@@ -457,7 +500,10 @@ function exporterFallback(texte) {
   document.body.removeChild(ta);
 }
 
-// Afficher tableau vide au départ
+// Restaurer les ventes du jour et le panier en cours, puis afficher
+chargerJour();
+chargerPanier();
+majUI();
 majTableau();
 </script>
 </body>
