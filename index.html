@@ -224,6 +224,19 @@
   </div>
 </div>
 
+<!-- Modal Canettes -->
+<div class="modal-overlay" id="modal-canettes" onclick="fermerModalCanettes(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="padding-bottom:20px;">
+    <div class="modal-titre">🥤 Canettes — 2,00 €</div>
+    <div class="modal-prix">Appuyez sur + / - pour chaque boisson</div>
+    <div id="canettes-liste" style="margin:12px 0;max-height:55vh;overflow-y:auto;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+      <button class="num-btn annuler" onclick="fermerModalCanettesBtn()">Annuler</button>
+      <button class="num-btn ok" onclick="confirmerCanettes()">✓ AJOUTER</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm Modal -->
 <div class="confirm-overlay" id="confirm-overlay">
   <div class="confirm-box">
@@ -244,11 +257,19 @@ const PRODUITS = [
   { id:'the',     nom:'Thé',          emoji:'🍵', prix:1.00 },
   { id:'encas',   nom:'En-cas',       emoji:'🍫', prix:1.00 },
   { id:'gateau',  nom:'Gâteau maison',emoji:'🍰', prix:2.00 },
-  { id:'canette', nom:'Canette',      emoji:'🥤', prix:2.00 },
 ];
 
-const STORAGE_KEY = 'cnf-le-huit-daily';
-const PANIER_KEY = 'cnf-le-huit-panier';
+const CANETTES = [
+  { id:'can_coca',     nom:'Coca',                emoji:'🥤', prix:2.00 },
+  { id:'can_coca0',    nom:'Coca Zéro',            emoji:'🥤', prix:2.00 },
+  { id:'can_perrier',  nom:'Perrier',              emoji:'💧', prix:2.00 },
+  { id:'can_orangina', nom:'Orangina',             emoji:'🟠', prix:2.00 },
+  { id:'can_mm_pomme', nom:'Minute Maid Pomme',    emoji:'🍎', prix:2.00 },
+  { id:'can_mm_exo',   nom:'Minute Maid Exotique', emoji:'🍹', prix:2.00 },
+  { id:'can_mm_orange',nom:'Minute Maid Orange',   emoji:'🍊', prix:2.00 },
+  { id:'can_bsa',      nom:'Bière sans alcool',    emoji:'🍺', prix:2.00 },
+  { id:'can_autre',    nom:'Autre',                emoji:'🥫', prix:2.00 },
+];
 
 let panier = {};
 let ventesJour = {}; // { id: qty total vendu }
@@ -259,42 +280,7 @@ let saisie = '';
 
 // Init ventes
 PRODUITS.forEach(p => { ventesJour[p.id] = 0; });
-
-// Sauvegarde des ventes du jour dans le localStorage
-function sauvegarderJour() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ventesJour, recetteJour, nbVentes }));
-  } catch (e) { /* localStorage indisponible */ }
-}
-
-// Restaure les ventes du jour depuis le localStorage
-function chargerJour() {
-  try {
-    const brut = localStorage.getItem(STORAGE_KEY);
-    if (!brut) return;
-    const data = JSON.parse(brut);
-    PRODUITS.forEach(p => { ventesJour[p.id] = (data.ventesJour && data.ventesJour[p.id]) || 0; });
-    recetteJour = data.recetteJour || 0;
-    nbVentes = data.nbVentes || 0;
-    document.getElementById('recette-jour').textContent = recetteJour.toFixed(2).replace('.', ',');
-    document.getElementById('nb-ventes').textContent = nbVentes + ' vente(s)';
-  } catch (e) { /* données corrompues, on ignore */ }
-}
-
-// Sauvegarde le panier en cours dans le localStorage
-function sauvegarderPanier() {
-  try {
-    localStorage.setItem(PANIER_KEY, JSON.stringify(panier));
-  } catch (e) { /* localStorage indisponible */ }
-}
-
-// Restaure le panier en cours depuis le localStorage
-function chargerPanier() {
-  try {
-    const brut = localStorage.getItem(PANIER_KEY);
-    if (brut) panier = JSON.parse(brut) || {};
-  } catch (e) { panier = {}; }
-}
+CANETTES.forEach(c => { ventesJour[c.id] = 0; });
 
 // Init grille
 const grid = document.getElementById('produits-grid');
@@ -311,6 +297,19 @@ PRODUITS.forEach(p => {
   btn.onclick = () => ouvrirModal(p);
   grid.appendChild(btn);
 });
+
+// Bouton canettes spécial
+const btnCan = document.createElement('button');
+btnCan.className = 'produit-btn';
+btnCan.id = 'btn-canettes';
+btnCan.innerHTML = `
+  <span class="qty-badge" id="badge-canettes">0</span>
+  <span class="emoji">🥤</span>
+  <span class="nom">Canettes</span>
+  <span class="prix">2,00 €</span>
+`;
+btnCan.onclick = () => ouvrirModalCanettes();
+grid.appendChild(btnCan);
 
 function ouvrirModal(p) {
   produitActif = p;
@@ -339,20 +338,23 @@ function confirmerQty() {
 function supprimerLigne(id) { delete panier[id]; majUI(); }
 
 function majUI() {
-  sauvegarderPanier();
   PRODUITS.forEach(p => {
     const badge = document.getElementById('badge-'+p.id);
     const qty = panier[p.id] || 0;
     badge.textContent = qty;
     badge.classList.toggle('visible', qty > 0);
   });
+  // Badge canettes = somme de toutes les canettes
+  const qtyCan = CANETTES.reduce((s,c) => s + (panier[c.id]||0), 0);
+  const badgeCan = document.getElementById('badge-canettes');
+  if (badgeCan) { badgeCan.textContent = qtyCan; badgeCan.classList.toggle('visible', qtyCan > 0); }
   const total = calcTotal();
   document.getElementById('total-header').textContent = total.toFixed(2).replace('.',',')+'€';
   const conteneur = document.getElementById('panier-contenu');
   const ids = Object.keys(panier).filter(id => panier[id] > 0);
   if (ids.length === 0) { conteneur.innerHTML = '<div class="panier-vide">Aucun article sélectionné</div>'; return; }
   conteneur.innerHTML = ids.map(id => {
-    const p = PRODUITS.find(x => x.id === id);
+    const p = PRODUITS.find(x => x.id === id) || CANETTES.find(x => x.id === id);
     const qty = panier[id];
     const st = (p.prix * qty).toFixed(2).replace('.',',');
     return `<div class="panier-ligne">
@@ -366,7 +368,8 @@ function majUI() {
 
 function calcTotal() {
   return Object.keys(panier).reduce((s, id) => {
-    const p = PRODUITS.find(x => x.id === id);
+    const p = PRODUITS.find(x => x.id === id) || CANETTES.find(x => x.id === id);
+    if (!p) return s;
     return s + p.prix * (panier[id] || 0);
   }, 0);
 }
@@ -382,7 +385,6 @@ function valider() {
   document.getElementById('nb-ventes').textContent = nbVentes + ' vente(s)';
   showToast('✓ Encaissé : ' + total.toFixed(2).replace('.',',') + ' €');
   majTableau();
-  sauvegarderJour();
   panier = {};
   majUI();
 }
@@ -392,7 +394,8 @@ function majTableau() {
   const tfoot = document.getElementById('tableau-foot');
   let totalGlobal = 0;
   let totalQte = 0;
-  tbody.innerHTML = PRODUITS.map(p => {
+  const tousLesArticles = [...PRODUITS, ...CANETTES];
+  tbody.innerHTML = tousLesArticles.map(p => {
     const qty = ventesJour[p.id] || 0;
     const total = qty * p.prix;
     totalGlobal += total;
@@ -434,12 +437,12 @@ function confirmerNon() {
 function resetJour() {
   demanderConfirm('Réinitialiser ?', 'Toutes les ventes du jour seront effacées.', () => {
     PRODUITS.forEach(p => { ventesJour[p.id] = 0; });
+    CANETTES.forEach(c => { ventesJour[c.id] = 0; });
     recetteJour = 0;
     nbVentes = 0;
     document.getElementById('recette-jour').textContent = '0,00';
     document.getElementById('nb-ventes').textContent = '0 vente(s)';
     majTableau();
-    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* localStorage indisponible */ }
     showToast('Journée réinitialisée');
   });
 }
@@ -448,7 +451,6 @@ function resetPanier() {
   if (Object.keys(panier).length === 0) return;
   demanderConfirm('Vider le panier ?', 'La commande en cours sera annulée.', () => {
     panier = {};
-    try { localStorage.removeItem(PANIER_KEY); } catch (e) { /* localStorage indisponible */ }
     majUI();
     showToast('Panier vidé');
   });
@@ -460,6 +462,57 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+
+// --- CANETTES ---
+let selectionCanettes = {};
+
+function ouvrirModalCanettes() {
+  selectionCanettes = {};
+  CANETTES.forEach(c => { selectionCanettes[c.id] = 0; });
+  renderCanettesList();
+  document.getElementById('modal-canettes').classList.add('open');
+}
+
+function renderCanettesList() {
+  const liste = document.getElementById('canettes-liste');
+  liste.innerHTML = CANETTES.map(c => `
+    <div style="display:flex;align-items:center;padding:8px 4px;border-bottom:1px solid #f0e0e0;">
+      <span style="font-size:1.2rem;margin-right:8px;">${c.emoji}</span>
+      <span style="flex:1;font-size:0.9rem;font-weight:700;">${c.nom}</span>
+      <button onclick="changeCanette('${c.id}',-1)" style="background:#fdeaea;border:2px solid #e0d0d0;border-radius:8px;width:36px;height:36px;font-size:1.2rem;font-weight:700;color:#b01010;cursor:pointer;">−</button>
+      <span id="qty-${c.id}" style="min-width:32px;text-align:center;font-family:Oswald,sans-serif;font-size:1.1rem;font-weight:700;color:#b01010;">${selectionCanettes[c.id]}</span>
+      <button onclick="changeCanette('${c.id}',1)" style="background:#b01010;border:none;border-radius:8px;width:36px;height:36px;font-size:1.2rem;font-weight:700;color:white;cursor:pointer;">+</button>
+    </div>
+  `).join('');
+}
+
+function changeCanette(id, delta) {
+  selectionCanettes[id] = Math.max(0, (selectionCanettes[id]||0) + delta);
+  const el = document.getElementById('qty-'+id);
+  if (el) el.textContent = selectionCanettes[id];
+}
+
+function confirmerCanettes() {
+  const total = CANETTES.reduce((s,c) => s + (selectionCanettes[c.id]||0), 0);
+  if (total === 0) { showToast('Aucune canette sélectionnée'); return; }
+  CANETTES.forEach(c => {
+    if (selectionCanettes[c.id] > 0) {
+      panier[c.id] = (panier[c.id]||0) + selectionCanettes[c.id];
+    }
+  });
+  document.getElementById('modal-canettes').classList.remove('open');
+  majUI();
+  showToast(total + ' canette(s) ajoutée(s)');
+}
+
+function fermerModalCanettes(e) {
+  if (e.target === document.getElementById('modal-canettes')) document.getElementById('modal-canettes').classList.remove('open');
+}
+function fermerModalCanettesBtn() {
+  document.getElementById('modal-canettes').classList.remove('open');
+}
+
+// --- FIN CANETTES ---
 
 function exporterCSV() {
   const date = new Date().toLocaleDateString('fr-FR');
@@ -500,10 +553,7 @@ function exporterFallback(texte) {
   document.body.removeChild(ta);
 }
 
-// Restaurer les ventes du jour et le panier en cours, puis afficher
-chargerJour();
-chargerPanier();
-majUI();
+// Afficher tableau vide au départ
 majTableau();
 </script>
 </body>
