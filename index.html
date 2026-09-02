@@ -256,7 +256,7 @@ const PRODUITS = [
   { id:'cafe',    nom:'Café',         emoji:'☕', prix:1.00 },
   { id:'the',     nom:'Thé',          emoji:'🍵', prix:1.00 },
   { id:'encas',   nom:'En-cas',       emoji:'🍫', prix:1.00 },
-  { id:'gateau',  nom:'Gâteau maison',emoji:'🍰', prix:2.00 },
+  { id:'gateau',  nom:'Gâteau & Salade de fruits',emoji:'🍰', prix:2.00 },
 ];
 
 const CANETTES = [
@@ -517,13 +517,14 @@ function fermerModalCanettesBtn() {
 function exporterCSV() {
   const date = new Date().toLocaleDateString('fr-FR');
   let texte = 'Date\tArticle\tQuantite\tPrix unitaire\tTotal\n';
-  PRODUITS.forEach(p => {
+  const tousLesArticles = [...PRODUITS, ...CANETTES];
+  tousLesArticles.forEach(p => {
     const qty = ventesJour[p.id] || 0;
     const total = (qty * p.prix).toFixed(2).replace('.', ',');
     const prix = p.prix.toFixed(2).replace('.', ',');
     texte += date + '\t' + p.nom + '\t' + qty + '\t' + prix + '\t' + total + '\n';
   });
-  const totalJour = PRODUITS.reduce((s,p) => s + (ventesJour[p.id]||0)*p.prix, 0);
+  const totalJour = tousLesArticles.reduce((s,p) => s + (ventesJour[p.id]||0)*p.prix, 0);
   texte += date + '\tTOTAL\t\t\t' + totalJour.toFixed(2).replace('.', ',') + '\n';
 
   // Copier dans le presse-papier
